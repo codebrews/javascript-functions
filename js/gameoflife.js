@@ -5,121 +5,85 @@ function seed() {
 }
 
 function same([x, y], [j, k]) {
-  if (x === j && y === k) {
-    return true;
-  }
-  return false;
+  return x === j && y === k;
 }
 
 // The game state to search for `cell` is passed as the `this` value of the function.
 function contains(cell) {
-  for (value of this) {
-    if (same(cell, value)) {
-      return true;
-    }
-  }
-  return false;
+  return this.some((c) => same(c, cell));
 }
 
 const printCell = (cell, state) => {
-  if (contains.call(state, cell)) {
-    return '\u25A3';
-  }
-  return '\u25A2';
+  return contains.call(state, cell) ? '\u25A3' : '\u25A2';
 };
 
 const corners = (state = []) => {
   if (state.length === 0) {
-    return { topRight: [0, 0], bottomLeft: [0, 0] }
-  } else {
-    let xVals = [];
-    let yVals = [];
-    for (v of state) {
-      xVals.push(v[0]);
-      yVals.push(v[1]);
-    }
-    return { 
-      topRight: [Math.max(...xVals), Math.max(...yVals)], 
-      bottomLeft: [Math.min(...xVals), Math.min(...yVals)] 
-    }
+    return { topRight: [0, 0], bottomLeft: [0, 0] };
+  }
+  const xVals = state.map(([x, _]) => x);
+  const yVals = state.map(([_, y]) => y);
+  return { 
+    topRight: [Math.max(...xVals), Math.max(...yVals)], 
+    bottomLeft: [Math.min(...xVals), Math.min(...yVals)] 
   }
 };
 
 const printCells = (state) => {
-  let gameString = "";
-  if (state.length === 0){return gameString}
-  let xStart = corners(state).bottomLeft[0];
-  let yStart = corners(state).topRight[1];
-  let width = corners(state).topRight[0] - xStart;
-  let height = yStart - corners(state).bottomLeft[1];
-  for (let yIndex = 0; yIndex <= height; yIndex++){
-    for (let xIndex = 0; xIndex <= width; xIndex++){
-      gameString += `${printCell([xStart + xIndex, yStart - yIndex], state)} `
+  const { bottomLeft, topRight } = corners(state);
+  let accumulator = "";
+  for (let y = topRight[1]; y >= bottomLeft[1]; y--){
+    for (let x = bottomLeft[0]; x <= topRight[0]; x++){
+      accumulator += `${printCell([x, y], state)} `
     }
-    gameString += "\n"
+    accumulator += "\n"
   }
-  return gameString;
+  return accumulator;
 };
 
 const getNeighborsOf = ([x, y]) => {
-  return [[x-1,y-1], [x-1,y], [x-1,y+1],
-          [x,y-1], [x,y+1],
-          [x+1,y-1], [x+1,y], [x+1,y+1] ]
+  return [[x-1,y+1], [x,y+1], [x+1,y+1],
+          [x-1,y],            [x+1,y],
+          [x-1,y-1], [x,y-1], [x+1,y-1] ]
 };
 
 const getLivingNeighbors = (cell, state) => { 
-  let liveNeighbors = [];
-  for (v of getNeighborsOf(cell)){
-    if (contains.call(state, v))
-    liveNeighbors.push(v);
-  }
-  return liveNeighbors;
+  return getNeighborsOf(cell).filter((n) => contains.bind(state)(n));
 };
 
 const willBeAlive = (cell, state) => {
-  if (getLivingNeighbors(cell, state).length === 3){
-    return true;
-  } else if (getLivingNeighbors(cell, state).length === 2 && contains.call(state, cell)){
-    return true;
-  } else {
-    return false;
-  }
+  const livingNeighbors = getLivingNeighbors(cell, state);
+
+  return (
+    livingNeighbors.length === 3 ||
+    (contains.call(state, cell) && livingNeighbors.length === 2)
+  );
 };
 
 const calculateNext = (state) => {
-  let newGrid = [];
-  let xStart = corners(state).bottomLeft[0] - 1;
-  let yStart = corners(state).bottomLeft[1] -1;
-  let xEnd = corners(state).topRight[0] + 1;
-  let yEnd = corners(state).topRight[1] + 1;
-  let height = yEnd - yStart;
-  let width = xEnd - xStart;
-  for (let yIndex = 0; yIndex <= height; yIndex++){
-    for (let xIndex = 0; xIndex <= width; xIndex++){
-      newGrid.push([xStart + xIndex, yStart + yIndex]);
+  const {bottomLeft, topRight } = corners(state);
+  let result = [];
+  for (let y = topRight[1] + 1; y >= bottomLeft[1] - 1; y--){
+    for (let x = bottomLeft[0] -1; x <= topRight[0] + 1; x++){
+      if(willBeAlive([x, y], state)){
+        result.push([x, y]);
+      }
     }
   }
-  let nextState = [];
-  for (v of newGrid){
-    if (willBeAlive(v, state)){
-      nextState.push(v);
-    }
-  }
-  return nextState;
+  return result;
 };
 
 const iterate = (state, iterations) => {
-  let gameStates = state;
+  let result = [state];
   for (let i = 0; i < iterations; i++){
-    state = nextState(state);
-    gameStates.push(state);
+    state = calculateNext(state);
+    result.push(state);
   }
-  return gameStates;
+  return result;
 };
 
 const main = (pattern, iterations) => {
-  let p = pattern;
-  for (v of iterate(startPatterns.p, iterations)){
+  for (v of iterate(startPatterns[pattern], iterations)){
     console.log(`${printCells(v)}\n`);
   }
 };
